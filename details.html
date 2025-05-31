@@ -223,6 +223,7 @@
           `${baseUrl}/posts/${postId.get("postId")}`
         );
         let post = response.data.data;
+        const title = post.title || "";
         console.log(post);
         const tags =
           post.tags.length > 0
@@ -243,7 +244,7 @@
 <div class="card-body">
   <img class="w-100" src="${post.image}" alt="">
   <h6 class="text-muted mt-1">${post.created_at}</h6>
-  <h5>${post.title}</h5>
+  <h5>${title}</h5>
   <p>${post.body}</p>
   <hr>
   <div class="d-flex align-items-center gap-2">

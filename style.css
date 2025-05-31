@@ -70,11 +70,12 @@ body {
 }
 
 #liveAlertPlaceholder{
-    position: fixed !important;
-    top: 448px !important;
-    left: 100% !important;
-    z-index: 1061 !important;
-    width: 100% !important;
+  position: fixed !important;
+  top: 73% !important;
+  left: 66% !important;
+  z-index: 1061 !important;
+  width: 83% !important;
+
 }
 textarea {
   width: 100%;

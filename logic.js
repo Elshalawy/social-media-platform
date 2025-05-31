@@ -17,15 +17,22 @@ const elements = {
   post_create: document.querySelector(".new-post"),
   post_title: document.querySelector("#post-title"),
   post_body: document.querySelector("#post-body"),
+  post_id_input: document.getElementById("post-id-input"),
 };
+console.log(elements.post_btn)
 let currentPage = 1;
 let lastpage = 1;
 // Fetch Posts
-async function fetchPosts(currentPage = 1) {
+async function fetchPosts(currentPage = 1,reset = false) {
   try {
-    const response = await axios.get(`${baseUrl}/posts?limit=5&page=${currentPage}`);
+    if (reset) {
+      elements.postsContainer.innerHTML = ""; // Clear posts container
+    }
+    const response = await axios.get(
+      `${baseUrl}/posts?limit=5&page=${currentPage}`
+    );
     let posts = response.data.data;
-    let content = '';
+    let content = "";
     lastpage = response.data.meta.last_page;
     for (const post of posts) {
       if (post.author.username !== "hhhff") {
@@ -42,11 +49,10 @@ async function fetchPosts(currentPage = 1) {
       <div class="card shadow mb-3" id= ${post.id} >
 <div class="card-header d-flex align-items-center gap-2">
 <div>
-  <img class="rounded-circle" src="${post.author.profile_image
-          }" alt="">
+  <img class="rounded-circle" src="${post.author.profile_image}" alt="">
   <b>${post.author.username}</b>
   </div>
-  <button class='btn edit-btn btn-secondary'>edit</button>
+  ${post.author.username === JSON.parse(localStorage.getItem("User"))?.username ? `<button class="btn btn-outline-secondary edit-btn" type="button">edit</button>` : ""}
 </div>
 <div class="card-body">
   <img class="w-100" src="${post.image}" alt="">
@@ -66,8 +72,8 @@ async function fetchPosts(currentPage = 1) {
 </div>
   `;
       }
+      elements.postsContainer.innerHTML += content; // Set innerHTML once
     }
-    elements.postsContainer.innerHTML += content; // Set innerHTML once
   } catch (error) {
     console.error("Failed to fetch posts:", error);
     showAlert("Failed to load posts", "danger");
@@ -76,32 +82,52 @@ async function fetchPosts(currentPage = 1) {
     let editBtns = document.querySelectorAll(".edit-btn");
     cards.forEach((card) => {
       card.addEventListener("click", postClickd);
-    })
+    });
     editBtns.forEach((editBtn) => {
       editBtn.addEventListener("click", function (e) {
         let target = e.currentTarget.parentElement.parentElement;
+        elements.post_id_input.value = target.id;
+
         document.getElementById("postTitle").innerHTML = "Edit Post";
         elements.post_title.value = target.querySelector("h5").textContent;
         elements.post_body.value = target.querySelector("p").textContent;
-        document.getElementById("create-post-image").files[0] = target.querySelector("img").getAttribute("src");
-        let postModal = new bootstrap.Modal(document.querySelector("#postModal"), {});
-        postModal.show()
-      });
+        document.getElementById("create-post-image").files[0] = target
+          .querySelector("img")
+          .getAttribute("src");
+        let postModal = new bootstrap.Modal(
+          document.querySelector("#postModal"),
+          {}
+        );
+        postModal.show();
+      })
     })
-    
+  }
 }
+  
+  
+
+// Reset Post Modal Function
+function resetPostModal() {
+  elements.post_id_input.value = "";
+  elements.post_title.value = "";
+  elements.post_body.value = "";
+  document.getElementById("create-post-image").value = "";
+  document.getElementById("postTitle").innerHTML = "Create A New Post";
 }
+
 //  update
 function update() {
   if (localStorage.getItem("token") == null) {
-    elements.logoutui.style.setProperty("display", "none","important");
+    elements.logoutui.style.setProperty("display", "none", "important");
     elements.loginui.style.setProperty("display", "flex", "important");
     elements.post_btn.style.setProperty("display", "none", "important");
   } else {
     elements.profile_inf.textContent = JSON.parse(
       localStorage.getItem("User")
     ).username;
-    elements.profileImage.src = JSON.parse(localStorage.getItem("User")).profile_image 
+    elements.profileImage.src = JSON.parse(
+      localStorage.getItem("User")
+    ).profile_image;
     elements.logoutui.style.setProperty("display", "flex", "important");
     elements.loginui.style.setProperty("display", "none", "important");
     elements.post_btn?.style.setProperty("display", "flex", "important");
@@ -114,10 +140,54 @@ function postClickd(e) {
   // console.log(elementId);
 }
 // ============= Post Clicked =================
+// ============= Post EDIT =================
+async function postCreate() {
+  let IScreate = elements.post_id_input.value === "" || elements.post_id_input.value === null;
+  if (elements.post_body.value && elements.post_img !== "") {
+    post_img = document.querySelector("#create-post-image").files[0];
+    try {
+      const formData = new FormData();
+      formData.append("title", elements.post_title.value);
+      formData.append("image", post_img);
+      formData.append("body", elements.post_body.value);
+      headers  =   {
+        "Content-Type": "multipart/form-data",
+        "Authorization": `Bearer ${localStorage.getItem("token")}`,
+      }
+      let url = `${baseUrl}/posts`;
+      let response = ""
+      if (IScreate) { 
+    response = await axios.post(`${url}`, formData, {
+          headers: headers,
+        });
+      } else {
+        formData.append("_method","put")
+        url += `/${elements.post_id_input.value}`; 
+        response = await axios.post(`${url}`, formData, {
+          headers: headers,
+        });
+      }
+      let modal = bootstrap.Modal.getInstance(
+        document.querySelector("#postModal")
+      );
+      modal.hide();
+      fetchPosts(1,true)
+        showAlert("post created successfully!", "success");
+
+    } catch (error) {
+      console.error("Login failed:", error);
+      showAlert(error.response?.data?.message || "Login failed", "danger");
+    } finally {
+      elements.post_body.value = "";
+      elements.post_title.value = "";
+      elements.post_img = null; // Reset the file input
+    }
+  }
+}
+// ============= Post EDIT =================
 // Alert Function
-function showAlert(message,type) {
+function showAlert(message, type) {
   const alertPlaceholder = document.getElementById("liveAlertPlaceholder");
-  const appendAlert = (message, type) => {
     const wrapper = document.createElement("div");
     wrapper.innerHTML = [
       `<div class="alert alert-${type} alert-dismissible" role="alert">`,
@@ -127,22 +197,20 @@ function showAlert(message,type) {
     ].join("");
 
     alertPlaceholder.append(wrapper);
-  };
 
-      appendAlert(message,type);
-
+console.log(alertPlaceholder)
   // Auto dismiss after 3 seconds
-  setInterval(() =>
-    document.querySelector(".alert .btn-close")?.click()
-    , 3000)
+  setTimeout(() => document.querySelector(".alert .btn-close")?.click(), 3000);
 }
 window.addEventListener("scroll", function () {
-  const endOfPage = Math.ceil(window.innerHeight + window.scrollY +4) >= document.body.offsetHeight;
+  const endOfPage =
+    Math.ceil(window.innerHeight + window.scrollY + 4) >=
+    document.body.offsetHeight;
   if (endOfPage && currentPage < lastpage) {
     currentPage++;
-        fetchPosts(currentPage)
-      }
-    })
+    fetchPosts(currentPage);
+  }
+});
 
 // Event Listeners
 elements.loginBtn.addEventListener("click", async function () {
@@ -160,11 +228,12 @@ elements.loginBtn.addEventListener("click", async function () {
             "Accept": "application/json",
           },
         }
-      );      localStorage.setItem("token", response.data.token);
+      );
+      localStorage.setItem("token", response.data.token);
       localStorage.setItem("User", JSON.stringify(response.data.user));
       let modal = bootstrap.Modal.getInstance(document.querySelector("#login"));
-      if (modal) modal.hide();
-      // Update UI
+        modal.hide();
+fetchPosts(1,true)
       update();
       showAlert("Logged in successfully!", "success");
     } catch (error) {
@@ -182,16 +251,16 @@ elements.logoutBtn.addEventListener("click", async function () {
     if (!token) {
       throw new Error("No active session found");
     }
-    
+
     // Make logout API call
     await axios.post(
       `${baseUrl}/logout`,
       {},
       {
         headers: {
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
       }
     );
@@ -199,6 +268,7 @@ elements.logoutBtn.addEventListener("click", async function () {
     localStorage.clear();
     // Update UI
     update();
+    fetchPosts(1 ,true)
     showAlert("Logged out successfully!", "info");
   } catch (error) {
     console.error("Logout failed:", error);
@@ -206,29 +276,34 @@ elements.logoutBtn.addEventListener("click", async function () {
   }
 });
 elements.registerBtn.addEventListener("click", async function () {
-  if (elements.reusername.value && elements.repassword.value && elements.name.value !== "" ) {
+  if (
+    elements.reusername.value &&
+    elements.repassword.value &&
+    elements.name.value !== ""
+  ) {
     try {
-      let formdata = new FormData() 
-formdata.append("username", elements.reusername.value);
-formdata.append("password", elements.repassword.value);
-formdata.append("name", elements.name.value);
-formdata.append("image", document.querySelector("#register-image").files[0]);
-      const response = await axios.post(
-        `${baseUrl}/register`,formdata,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
+      let formdata = new FormData();
+      formdata.append("username", elements.reusername.value);
+      formdata.append("password", elements.repassword.value);
+      formdata.append("name", elements.name.value);
+      formdata.append(
+        "image",
+        document.querySelector("#register-image").files[0]
       );
+      const response = await axios.post(`${baseUrl}/register`, formdata, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
       localStorage.setItem("token", response.data.token);
       localStorage.setItem("User", JSON.stringify(response.data.user));
-      let modal = bootstrap.Modal.getInstance(document.querySelector("#register"));
-        modal.hide();
-      // Update UI
+      let modal = bootstrap.Modal.getInstance(
+        document.querySelector("#register")
+      );
+      modal.hide();
+fetchPosts( 1,true)
       update();
       showAlert("register in successfully!", "success");
-      console.log(response.data);
     } catch (error) {
       console.error("register failed:", error);
       showAlert(error.response?.data?.message || "Login failed", "danger");
@@ -238,38 +313,10 @@ formdata.append("image", document.querySelector("#register-image").files[0]);
     }
   }
 });
-elements.post_create?.addEventListener("click", async function () {
-  if (elements.post_body.value && elements.post_img !== "") {
-    post_img = document.querySelector("#create-post-image").files[0]
-    try {
-      const formData = new FormData();
-      formData.append("title", elements.post_title.value);
-      formData.append("image", post_img);
-      formData.append("body", elements.post_body.value);
-      const response = await axios.post(
-        `${baseUrl}/posts`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-            "Authorization": `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      )
-      let modal = bootstrap.Modal.getInstance(document.querySelector("#postModal"));
-      modal.hide();
-      showAlert("post created successfully!", "success");
-      fetchPosts()
-    } catch (error) {
-      console.error("Login failed:", error);
-      showAlert(error.response?.data?.message || "Login failed", "danger");
-    } finally {
-      elements.post_body.value = "";
-      elements.post_title.value = "";
-      elements.post_img = null; // Reset the file input
-    }
-  }
-});
+elements.post_create?.addEventListener("click", postCreate);
+
+// Add post button click handler
+elements.post_btn?.addEventListener("click", resetPostModal);
 
 if (
   window.location.href === "http://127.0.0.1:5500/tasks/final_project/index.htm"
